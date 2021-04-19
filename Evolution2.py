@@ -9,7 +9,7 @@ class Minchen:
     def __init__(self, label='', strength=1.0):
         self.label = label
         self.age = 0
-        self.nutrients = 1
+        self.nutrients = 1.0
         self.strength = strength
         self.alive = True
         self.child_counter = 0
@@ -123,6 +123,33 @@ class Woods:
                 winner = strength_rolls.index(max(strength_rolls))
                 foodfield[winner].eat()
                 self.food -= 1
+
+        def weighted_food_distribution(self, food_per_field):
+            foodfields = []
+            mixed_minchens = self.minchens.copy()
+            random.shuffle(mixed_minchens)
+            for i in range(self.food / food_per_field):
+                foodfields.append([])
+            while len(mixed_minchens) > 0:
+                try:
+                    for j in range(len(foodfields)):
+                        foodfields[j].append(mixed_minchens.pop())
+                except:
+                    break
+            for foodfield in foodfields:
+                if len(foodfield) == 1:
+                    [foodfield[0].eat() for _ in range(food_per_field)]
+                    self.food -= food_per_field
+                elif len(foodfield) > 1:
+                    strength_rolls = []
+                    for minchen in foodfield:
+                        strength_rolls.append(minchen.strength_roll())
+                    winner = strength_rolls.index(max(strength_rolls))
+                    foodfield[winner].eat()
+                    self.food -= food_per_field
+
+            # TODO: Determine first winner, determine second winner. Then Create Ratio as Strength1/Strength2,
+            # then distribute food among two winners according to ratio :)
 
     def forward(self):
         self.bury()
