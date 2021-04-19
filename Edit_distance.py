@@ -45,7 +45,8 @@ def initialize_matrix(matrix):
 
 def enumerate_matrix(seq1, seq2):
     '''
-    Calculate the values in the alignment matrix. Each value is calculated as the minimum of three possible values:
+    Creates and initializes an alignment matrix based on the two provided sequences.Calculates the values in the
+    alignment matrix. Each value is calculated as the minimum of three possible values:
         1) Upper neighboring vertical value + 1
         2) Horizontal value to the left + 1
         3) Diagonal value to the upper left + 1 (if characters in the sequences do not match; represents substitution)
