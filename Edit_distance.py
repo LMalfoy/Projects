@@ -70,7 +70,7 @@ def enumerate_matrix(seq1, seq2):
 
 def main():
     # Read .fasta file and get sequences
-    sequences, order = read_file("input.txt")
+    sequences, order = read_file("Manhattan_Tourist_input.txt")
     seq1, seq2 = sequences[order[0]], sequences[order[1]]
     # Create and enumerate the edit / alignment matrix
     matrix = enumerate_matrix(seq1, seq2)
