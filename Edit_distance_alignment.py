@@ -25,83 +25,84 @@ def read_file(file):
     return entries, order
 
 
-def create_matrix(seq1, seq2):
+def create_diagonal_vectors(seq1, seq2):
     '''
-    Creates an m * n alignment matrix filled with zeroes. With m = length(seq1) + 1 and n = length(seq2) + 1.
+    Calculates whether an alignment of two characters in sequences seq1 and seq2 is a match (= 1) or a mismatch (= 0).
+    It uses this information to create a diagonal vector matrix used for the generation of aan alignment map.
     '''
-    return np.zeros((len(seq1) + 1, len(seq2) + 1), dtype=int)
-
-
-def initialize_matrix(matrix):
-    '''
-    Initializes the alignment matrix (first row and file of the matrix filled with correct numbers).
-    '''
-    n, m = matrix.shape
-    for i in range(n):
-        matrix[i][0] = i
-    for j in range(m):
-        matrix[0][j] = j
+    diagonal = np.zeros((len(seq1), len(seq2)), dtype=int)
+    for i in range(len(seq1)):
+        for j in range(len(seq2)):
+            if seq1[i] == seq2[j]:
+                diagonal[i][j] = 1
+            else:
+                diagonal[i][j] = 0
+    return diagonal
 
 
 def enumerate_matrix(seq1, seq2):
     '''
-    Creates and initializes an alignment matrix based on the two provided sequences.Calculates the values in the
-    alignment matrix. Each value is calculated as the minimum of three possible values:
-        1) Upper neighboring vertical value + 1
-        2) Horizontal value to the left + 1
-        3) Diagonal value to the upper left + 1 (if characters in the sequences do not match; represents substitution)
-            or diagonal value to the upper left + 0 (if characters in the sequences match; represents not editing)
-    See "Bioinformatic Algorithms: An Active Learning Approach" (Compeau & Pevzner, 2014), Chapter 5 for more
-    information on dynamic programming.
+    Creates an alignment map of two sequences seq1 and seq2 and creates a backtrack map from it. For this three
+    directional vector matrices are created (down, all vectors pointing down; right, all vectors pointing right;
+    diagonal, all vectors pointing diagonally down-right). The right vector used for each point in the alignment
+    map is the minimum of all corresponding points in the down, right or diagonal vector.
+
+    See Bioinformatic Algorithms (Compeau, Pevzner), Chapter 5. Its too complicated for a short comment like this.
     '''
-    matrix = create_matrix(seq1, seq2)
-    initialize_matrix(matrix)
-    for i in range(1, len(seq1) + 1):
-        for j in range(1, len(seq2) + 1):
-            vertical = matrix[i-1][j] + 1
-            horizontal = matrix[i][j-1] + 1
-            if seq1[i-1] == seq2[j-1]:
-                diagonal = matrix[i-1][j-1]
-            else:
-                diagonal = matrix[i-1][j-1] + 1
-            matrix[i][j] = min(vertical, horizontal, diagonal)
-    return matrix
+    m = len(seq1)
+    n = len(seq2)
+    map = np.zeros((m + 1, n + 1), dtype=int)
+    right = np.zeros((m + 1, n), dtype=int)
+    down = np.zeros((m, n + 1), dtype=int)
+    diagonal = create_diagonal_vectors(seq1, seq2)
+    backtrack = np.zeros((m+1, n+1), dtype=int) # right: 0; down: 1; diagonal: 2
+
+    # Enumerate rims
+    for i in range(m):
+        map[i+1][0] = map[i][0] + down[i][0]
+        backtrack [i+1][0] = 1
+    for j in range(n):
+        map[0][j+1] = map[0][j] + right[0][j]
+        backtrack[0][j+1] = 0
+
+    # Enumerate center
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            map[i][j] = max(map[i][j-1] + right[i][j-1], map[i-1][j] + down[i-1][j], map[i-1][j-1] + diagonal[i-1][j-1])
+            if map[i][j] == map[i][j-1] + right[i][j-1]:
+                backtrack[i][j] = 0
+            elif map[i][j] == map[i-1][j] + down[i-1][j]:
+                backtrack[i][j] = 1
+            elif map[i][j] == map[i-1][j-1] + diagonal[i-1][j-1]:
+                backtrack[i][j] = 2
+    return map, backtrack
 
 
-def backtrack(seq1, seq2, matrix):
+def backtrack(seq1, seq2, backtrack):
+    '''
+    Uses a backtrack map to align two sequences seq1 and seq2. At this point an arbitrary alignment is returned,
+    NOT an optimal one.
+    '''
     copy1 = seq1
     copy2 = seq2
     align1 = ''
     align2 = ''
-    i, j = matrix.shape
-    i -= 1
-    j -= 1
+    i = len(seq1)
+    j = len(seq2)
     while i > 0 or j > 0:
-        '''
-        General workflow and changing of variables is right. But the matrix right now is enumerated in a way,
-        that encourages wrong paths with equal value through it. Path information is lost in flat landscapes.
-        Every node has its point derived from neighboring nodes, but when all nodes have same value in neighborhood
-        origin of individual node points is obscured!
-        
-        Must find a way to retain directional information even in flat value landscapes!
-        '''
-        vertical = matrix[i-1][j]
-        horizontal = matrix[i][j-1]
-        diagonal = matrix[i-1][j-1]
-        choice = min(vertical, horizontal, diagonal)
-        if choice == vertical:
+        if backtrack[i][j] == 1:
             copy1, char = copy1[:-1], copy1[-1]
             align1 += '-'
             align2 += char
             i -= 1
             continue
-        elif choice == horizontal:
+        elif backtrack[i][j] == 0:
             copy2, char = copy2[:-1], copy2[-1]
             align1 += char
             align2 += '-'
             j -= 1
             continue
-        elif choice == diagonal:
+        elif backtrack[i][j] == 2:
             copy2, char2 = copy2[:-1], copy2[-1]
             copy1, char1 = copy1[:-1], copy1[-1]
             align1 += char2
@@ -112,16 +113,14 @@ def backtrack(seq1, seq2, matrix):
     return align1[::-1], align2[::-1]
 
 
-
 def main():
-    # Read .fasta file and get sequences
-    sequences, order = read_file("Manhattan_Tourist_input.txt")
-    seq1, seq2 = sequences[order[0]], sequences[order[1]]
-    # Create and enumerate the edit / alignment matrix
-    matrix = enumerate_matrix(seq1, seq2)
-    # Print out the last value in the matrix which represents the minimal edit distance
-    print(matrix[len(seq1)][len(seq2)])
-    print(backtrack(seq1, seq2, matrix))
+    seq1 = 'PRETTY'
+    seq2 = 'PRTTEIN'
+    map, tracker = enumerate_matrix(seq1, seq2)
+    print(map)
+    print(tracker)
+    alignment = backtrack(seq1, seq2, tracker)
+    print(alignment)
 
 
 if __name__ == '__main__':
